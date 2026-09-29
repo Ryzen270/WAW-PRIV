@@ -1,1 +1,269 @@
-Ezzz
+-- ============================================
+-- 🛑 ANCHOR V2 - CONGELA + BLOQUEA SALTOS
+-- Anchored + JumpPower = 0 mientras esté ON
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ============================================
+-- ⚙️ VARIABLES
+-- ============================================
+local anchored = false
+local savedJumpPower = 50
+local savedJumpHeight = 7.2
+local savedUseJumpPower = true
+local heartbeatConn = nil
+
+-- ============================================
+-- 🎨 GUI COMPACTA
+-- ============================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AnchorV2GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 160, 0, 110)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -55)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 100, 100)
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.2
+MainStroke.Parent = MainFrame
+
+-- Título
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 22)
+Title.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+Title.BackgroundTransparency = 0.2
+Title.BorderSizePixel = 0
+Title.Text = "🛑 ANCHOR V2"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextScaled = true
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Estado
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 16)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 26)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Estado: 🟢 Libre"
+StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+StatusLabel.TextScaled = true
+StatusLabel.Font = Enum.Font.GothamMedium
+StatusLabel.Parent = MainFrame
+
+-- Info
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(0.9, 0, 0, 14)
+InfoLabel.Position = UDim2.new(0.05, 0, 0, 44)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Text = "🔒 Ancla + Bloquea saltos"
+InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+InfoLabel.TextScaled = true
+InfoLabel.Font = Enum.Font.GothamMedium
+InfoLabel.Parent = MainFrame
+
+-- Botón toggle
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 26)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0, 62)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+ToggleBtn.BorderSizePixel = 0
+ToggleBtn.Text = "ANCLAR"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextScaled = true
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Parent = MainFrame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = ToggleBtn
+
+-- ============================================
+-- 🧠 FUNCIONES
+-- ============================================
+local function getChar()
+    return LocalPlayer.Character
+end
+
+local function getHumanoid()
+    local char = getChar()
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+-- ============================================
+-- 🔒 CONGELAR (ANCHOR + BLOQUEAR SALTOS)
+-- ============================================
+local function freeze()
+    local char = getChar()
+    if not char then return end
+
+    local humanoid = getHumanoid()
+    if not humanoid then return end
+
+    -- Guardar valores originales
+    savedJumpPower = humanoid.JumpPower
+    savedJumpHeight = humanoid.JumpHeight
+    savedUseJumpPower = humanoid.UseJumpPower
+
+    -- 1️⃣ Anclar todas las partes
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Anchored = true
+        end
+    end
+
+    -- 2️⃣ Bloquear saltos (doble seguridad)
+    humanoid.UseJumpPower = true
+    humanoid.JumpPower = 0
+    humanoid.JumpHeight = 0
+
+    -- 3️⃣ Neutralizar cualquier JumpRequest
+    local conn
+    conn = UserInputService.JumpRequest:Connect(function()
+        if anchored and humanoid then
+            humanoid.JumpPower = 0
+            humanoid.JumpHeight = 0
+        end
+    end)
+    -- Guardar conexión para desconectar al desactivar
+    heartbeatConn = conn
+
+    anchored = true
+end
+
+-- ============================================
+-- 🔓 DESCONGELAR
+-- ============================================
+local function unfreeze()
+    local char = getChar()
+    if not char then return end
+
+    local humanoid = getHumanoid()
+    if not humanoid then return end
+
+    -- 1️⃣ Desanclar
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Anchored = false
+        end
+    end
+
+    -- 2️⃣ Restaurar saltos
+    humanoid.UseJumpPower = savedUseJumpPower
+    humanoid.JumpPower = savedJumpPower
+    humanoid.JumpHeight = savedJumpHeight
+
+    -- 3️⃣ Desconectar el bloqueador de JumpRequest
+    if heartbeatConn then
+        heartbeatConn:Disconnect()
+        heartbeatConn = nil
+    end
+
+    anchored = false
+end
+
+-- ============================================
+-- 🛡️ BUCLE DE PROTECCIÓN
+-- ============================================
+-- Si algún script externo intenta cambiar JumpPower, lo forzamos a 0
+RunService.Heartbeat:Connect(function()
+    if not anchored then return end
+
+    local humanoid = getHumanoid()
+    if not humanoid then return end
+
+    if humanoid.JumpPower ~= 0 then
+        humanoid.JumpPower = 0
+    end
+    if humanoid.JumpHeight ~= 0 then
+        humanoid.JumpHeight = 0
+    end
+end)
+
+-- ============================================
+-- 🔄 ACTUALIZAR UI
+-- ============================================
+local function updateUI()
+    if anchored then
+        ToggleBtn.Text = "DESANCLAR"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 100)
+        StatusLabel.Text = "Estado: 🔴 Anclado"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+    else
+        ToggleBtn.Text = "ANCLAR"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        StatusLabel.Text = "Estado: 🟢 Libre"
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    end
+end
+
+-- ============================================
+-- 🔘 BOTÓN TOGGLE
+-- ============================================
+ToggleBtn.MouseButton1Click:Connect(function()
+    if anchored then
+        unfreeze()
+    else
+        freeze()
+    end
+    updateUI()
+end)
+
+-- ============================================
+-- ⌨️ ATAJO DE TECLADO (T)
+-- ============================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        if anchored then
+            unfreeze()
+        else
+            freeze()
+        end
+        updateUI()
+    end
+end)
+
+-- ============================================
+-- 🔄 RESET AL RESPAWNEAR
+-- ============================================
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    if anchored then
+        freeze()
+    end
+end)
+
+-- ============================================
+-- 📌 NOTIFICACIÓN
+-- ============================================
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "🛑 Anchor V2",
+        Text = "Ancla tu personaje + bloquea saltos",
+        Duration = 4
+    })
+end) 
