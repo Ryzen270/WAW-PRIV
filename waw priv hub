@@ -266,4 +266,4 @@ pcall(function()
         Text = "Ancla tu personaje + bloquea saltos",
         Duration = 4
     })
-end) 
+end)
